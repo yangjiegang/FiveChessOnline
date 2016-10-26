@@ -1,0 +1,443 @@
+<!DOCTYPE HTML>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>HTML5双人对战五子棋</title>
+    <style type="text/css">
+        #myCanvas {
+            position: absolute;
+            border: 1px solid grey;
+        }
+
+        .toolPanel {
+            width: 700px;
+            height: 120px;
+            position: relative;
+            margin: 520 0 0 520px;
+            padding: 10px;
+        }
+
+        #getBtn {
+            width: 100px;
+            height: 30px;
+            margin: 10px;
+        }
+
+        #backBtn {
+            width: 100px;
+            height: 30px;
+            margin: 10px;
+        }
+
+        .toolPanel>label:nth-of-type(1) {
+            height: 100px;
+            width: 100px;
+            margin: 10px;
+            border: solid 2px silver;
+            line-height: 100px;
+            border-radius: 15px;
+        }
+
+        .toolPanel>label:nth-of-type(2) {
+            height: 100px;
+            width: 100px;
+            margin: 10px;
+            border: solid 2px silver;
+            line-height: 100px;
+            border-radius: 15px;
+        }
+
+        #msgPanel{
+            width: 300px;
+            height: 500px;
+            padding: 10px;
+            margin: 0 0 0 520px;
+            padding: 10px;
+        }
+
+        #msgBox{
+            width: 280px;
+            height: 420px;
+            padding: 10px;
+            border:solid 1px grey;
+        }
+
+        #inputBox{
+            width: 280px;
+            height: 60px;
+            padding: 5px;
+            line-height:50px;
+            float: left;
+        }
+
+        #msgInput{
+            width: 210px;
+            height: 50px;
+        }
+
+        #sndBtn{
+            width: 50px;
+            height: 50px;
+        }
+
+    </style>
+    <script type="text/javascript" src="jquery-1.9.1.js"></script>
+</head>
+
+<body>
+
+    <canvas id="myCanvas" width="500px" height="500px">
+        您的浏览器不支持canvas标签。
+    </canvas>
+
+    <div id="msgPanel">
+        <div id="msgBox">
+
+        </div>
+        <div id="inputBox">
+            <textarea id="msgInput"></textarea>
+            <button id="sndBtn">send</button>
+        </div>
+    </div>
+
+    <div class="toolPanel">
+        <label>Chess Color</label>
+        <label>Sequence</label>
+        <button id="getBtn" onclick="getPos()">Get</button>
+        <button id="backBtn" onclick="backChess()">Back</button>
+    </div>
+    <script type="text/javascript">
+        function Board() {
+            var canvas = document.getElementById("myCanvas");
+            if (canvas.getContext) {
+                var ctx = canvas.getContext("2d");
+            //draw the grid
+            var grid_cols = 20;
+            var grid_rows = 20;
+            var cell_height = canvas.height / grid_rows;
+            var cell_width = canvas.width / grid_cols;
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = "#a0a0a0";
+            //结束边框描绘  
+            ctx.beginPath();
+            //准备画横线  
+            for (var col = 0; col <= grid_cols; col++) {
+                var x = col * cell_width;
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+            }
+            //准备画竖线  
+            for (var row = 0; row <= grid_rows; row++) {
+                var y = row * cell_height;
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+            }
+            //完成描绘  
+            ctx.stroke();
+        }
+    }
+
+    var Chess = {
+        isBlack: null,
+        sequence: -1,
+        isMyturn: true,
+        chessArr: [],
+        //No : 0,
+        backCount: 3,
+        canvas: document.getElementById("myCanvas"),
+    };
+
+    Chess.Init = function() {
+        for (var i = 0; i < 20; i++) {
+            Chess.chessArr[i] = [];
+            for (var j = 0; j < 20; j++) {
+                Chess.chessArr[i][j] = 0;
+            }
+        }
+    };
+
+    Chess.setPanel = function() {
+        var lbClr = $(".toolPanel>label:nth-of-type(1)");
+        var lbSeq = $(".toolPanel>label:nth-of-type(2)");
+        lbClr.text(Chess.isBlack === true ? "Black" : "White");
+        lbSeq.text(Chess.sequence === 0 ? "First" : "Last");
+    };
+
+    var choiceColor = function() {
+        $.ajax({
+            url: "chess.php",
+            type: "POST",
+            data: {
+                "choiceColor": true
+            },
+            success: function(callback) {
+                console.log(callback);
+                if (callback == "true") {
+                    Chess.isBlack = true;
+                    Chess.sequence = 0;
+                } else {
+                    Chess.isBlack = false;
+                    Chess.sequence = 1;
+                }
+
+            },
+        });
+    };
+
+    function markChess() {
+        //setInterval("getPos()",1000);
+        document.getElementById("myCanvas").onclick = function(e) {
+            if (Chess.isMyturn == true) {
+                e = e ? e : window.event;
+                var chessX = Math.round(e.offsetX / 25);
+                var chessY = Math.round(e.offsetY / 25);
+
+                if (Chess.chessArr[chessX][chessY] == 0) {
+                        //draw the chess
+                        var canvas = Chess.canvas;
+                        var ctx = canvas.getContext("2d");
+                        ctx.beginPath();
+                        ctx.strokeStyle = "grey";
+                        var circle = {
+                            x: chessX * 25, 
+                            y: chessY * 25, 
+                            r: 10
+                        };
+                        ctx.arc(circle.x, circle.y, circle.r, 0, Math.PI * 2, false);
+                        ctx.stroke();
+                        if (Chess.isBlack == true) {
+                            ctx.fillStyle = "black";
+                            ctx.fill();
+                            Chess.chessArr[chessX][chessY] = 1;
+                            sendPos(chessX, chessY);
+                            isWin(chessX, chessY, 1);
+
+                        } else if (Chess.isBlack == false) {
+                            ctx.fillStyle = "white";
+                            ctx.fill();
+                            Chess.chessArr[chessX][chessY] = -1;
+                            sendPos(chessX, chessY);
+                            isWin(chessX, chessY, -1);
+
+
+                        }
+                        Chess.isMyturn = false;
+                    }
+                }
+            }
+    } //markChess()
+
+    function sendPos(chessX, chessY) {
+        var pos = [chessX, chessY];
+        var color = Chess.isBlack == true ? 1 : -1;
+        $.ajax({
+            url: "chess.php",
+            type: "POST",
+            data: {
+                "clr": color,
+                "pos": pos,
+                "sendPos": true,
+            },
+            success: function(callback) {
+            }
+        });
+    }
+
+    function getPos() {
+        var color = Chess.isBlack == true ? 1 : -1;
+        $.ajax({
+            url: "chess.php",
+            type: "POST",
+            data: {
+                "color": color,
+                "getPos": true,
+            },
+            success: function(callback) {
+                console.log(callback);
+                var rival = $.parseJSON(callback);
+                var chessX = parseInt(rival["posX"]);
+                var chessY = parseInt(rival["posY"]);
+                if (Chess.chessArr[chessX][chessY] == 0) {
+                    //draw the chess
+                    var canvas = Chess.canvas;
+                    var ctx = canvas.getContext("2d");
+                    ctx.beginPath();
+                    ctx.strokeStyle = "grey";
+                    var circle = {
+                        x: chessX * 25, 
+                        y: chessY * 25, 
+                        r: 10
+                    };
+                    ctx.arc(circle.x, circle.y, circle.r, 0, Math.PI * 2, false);
+                    ctx.stroke();
+                    if (Chess.isBlack == true) {
+                        ctx.fillStyle = "white";
+                        ctx.fill();
+                        Chess.chessArr[chessX][chessY] = 1;
+                        isWin(chessX, chessY, -1);
+                    } else {
+                        ctx.fillStyle = "black";
+                        ctx.fill();
+                        Chess.chessArr[chessX][chessY] = -1;
+                        isWin(chessX, chessY, 1);
+                    }
+                    Chess.isMyturn = true;
+                }
+            }
+        });
+    }
+
+    function delChess(pos){
+
+        var posX = (parseInt(pos[0])-1)*25;//25
+        var posY = (parseInt(pos[1])-1)*25;//50
+        var ctx = Chess.canvas.getContext("2d");
+        ctx.clearRect(posX+12,posY+12,25,25);//clear then reline
+        ctx.lineWidth=1;
+        ctx.strokeStyle = "#a0a0a0";
+        ctx.beginPath();
+        ctx.moveTo(posX+12,posY+25);
+        ctx.lineTo(posX+12+25,posY+25);
+        ctx.moveTo(posX+25,posY+12);
+        ctx.lineTo(posX+25,posY+12+25);
+        ctx.stroke();
+    }
+
+    function backChess(){
+        if (Chess.backCount>0) {
+            Chess.backCount--;
+            var bw = Chess.isBlack == true ? 1 : -1;
+            $.ajax({
+                url: "chess.php",
+                type: "POST",
+                data: {
+                    "isBlack": bw,
+                    "backChess": true,
+                },
+                success: function(callback) {
+                    console.log("backChess", Chess.isBlack, callback);
+                    callback=$.parseJSON(callback);
+                    var posX=parseInt(callback["posX"]);
+                    var posY=parseInt(callback["posY"]);
+                    var pos=[posX,posY];
+                    delChess(pos);
+                    Chess.isMyturn=true;
+                }
+            });
+        } else {
+            alert("At most back 3 times!");
+            return;
+        }
+    }
+
+    function isWin(i, j, chessColor) {
+        var nums = 1; 
+        var m, n;
+        for (m = j - 1; m >= 0; m--) {
+            if (Chess.chessArr[i][m] === chessColor) {
+                nums++;
+            } else {
+                break;
+            }
+        }
+        for (m = j + 1; m < 20; m++) {
+            if (Chess.chessArr[i][m] === chessColor) {
+                nums++;
+            } else {
+                break;
+            }
+        }
+        if (nums >= 5) {
+            playerWin(chessColor);
+            return;
+        } else {
+            nums = 1;
+        }
+        for (m = i - 1; m >= 0; m--) {
+            if (Chess.chessArr[m][j] === chessColor) {
+                nums++;
+            } else {
+                break;
+            }
+        }
+        for (m = i + 1; m < 20; m++) {
+            if (Chess.chessArr[m][j] === chessColor) {
+                nums++;
+            } else {
+                break;
+            }
+        }
+        if (nums >= 5) {
+            playerWin(chessColor);
+            return;
+        } else {
+            nums = 1;
+        }
+        for (m = i - 1, n = j - 1; m >= 0 && n >= 0; m--, n--) {
+            if (Chess.chessArr[m][n] === chessColor) {
+                nums++;
+            } else {
+                break;
+            }
+        }
+        for (m = i + 1, n = j + 1; m < 20 && n < 20; m++, n++) {
+            if (Chess.chessArr[m][n] === chessColor) {
+                nums++;
+            } else {
+                break;
+            }
+        }
+        if (nums >= 5) {
+            playerWin(chessColor);
+            return;
+        } else {
+            nums = 1;
+        }
+        for (m = i - 1, n = j + 1; m >= 0 && n < 20; m--, n++) {
+            if (Chess.chessArr[m][n] === chessColor) {
+                nums++;
+            } else {
+                break;
+            }
+        }
+        for (m = i + 1, n = j - 1; m < 20 && n >= 0; m++, n--) {
+            if (Chess.chessArr[m][n] === chessColor) {
+                nums++;
+            } else {
+                break;
+            }
+        }
+        if (nums >= 5) {
+            playerWin(chessColor);
+            return;
+        }
+        return false;
+    }
+
+    function playerWin(chessColor) {
+        switch (chessColor) {
+            case -1:
+            alert("white chess win!");
+            break;
+            case 1:
+            alert("black chess win!");
+            break;
+            default:
+            alert("Game over!");
+            break;
+        }
+        window.location.reload();//refresh the borad
+    }
+
+
+    Board();
+    Chess.Init();
+    choiceColor();
+    setTimeout("Chess.setPanel()", 300);
+    setTimeout("markChess()", 500);
+
+</script>
+</body>
+
+</html>
